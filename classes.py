@@ -128,6 +128,18 @@ class House():
         self.time_available_for_meal_prep = [2, 0.5, 0.5, 0.5, 0.5, 1, 2] # time available for cooking each day of the week, not yet utilized
         self.budget = 20 #dollars, not used
     
+    def do_a_day(self, day:int):
+        ''' This will hold all of a houses actions and
+        decision making'''
+        if day % self.shopping_frequency == 0:
+            self.shop()
+        self.cook()
+        self.eat()
+        for food in self.fridge:
+            food.decay()
+        for food in self.pantry:
+            food.decay()
+
     def shop(self):
         # randomly selects frequency*2 items from the store
         # set seed with random_state= int
@@ -143,11 +155,7 @@ class House():
     
     def prep(self, food: Food, servings: int):
         if food.expiration_time <= 0:
-            self.waste({
-                'Type': food.type,
-                'kg': food.kg,
-                'House': self.id
-            })
+            self.waste(food=food)
             return
         prepped = copy.deepcopy(food)
         prepped.servings = servings
@@ -159,22 +167,53 @@ class House():
             self.pantry.remove(food)
             del food
         if prepped.inedible_parts > 0:
-            waste_kg = prepped.kg/prepped.inedible_parts
+            in_ed = copy.deepcopy(prepped)
+            in_ed.kg = prepped.kg/prepped.inedible_parts
             prepped.kg /= (1-prepped.inedible_parts) # remove the inedible parts
             prepped.serving_size /= (1-prepped.inedible_parts) # adjust the serving size accordingly
-            waste_data = {
-                'Type': 'Inedible Parts',
-                'kg': waste_kg,
-                'House': self.id
-            }
-            self.waste(waste_data= waste_data)
+            self.waste(food=in_ed)
         self.kitchen.append(prepped) # add the prepped food to be cooked or eaten from the kitchen
 
-    def waste(self, waste_data: dict):
-        '''RGO - make so that if it is cooked it breaks up waste
-        into all of it's parts with a column to denote whether 
-        it was on it's own when wasted or cooked'''
-        self.waste_bin.append(Waste(waste_data=waste_data))
+    def waste(self, food:Food):
+        '''RGO - Food gets tossed, assume if not in fridge or pantry
+        it's inedible Parts'''
+        if food in self.pantry:
+            self.waste_bin.append(Waste({
+                'kg': food.kg,
+                'Type': food.type,
+                'House': self.id,
+                'ed_status': 'Ed-Uncooked'
+            }))
+            self.pantry.remove(food)
+            del food
+        elif food in self.fridge:
+            if not isinstance(food,CookedFood):
+                self.waste_bin.append(Waste({
+                    'kg': food.kg,
+                    'Type': food.type,
+                    'House': self.id,
+                    'ed_status': 'Ed-Cooked'
+                }))
+                self.fridge.remove(food)
+                del food
+            else:
+                for key, value in food.composition.items():
+                    self.waste_bin.append(Waste({
+                        'kg': food.kg*value,
+                        'Type': key,
+                        'House': self.id,
+                        'ed_status': 'Ed-Cooked'
+                    }))
+                self.fridge.remove(food)
+                del food
+        else:
+            self.waste_bin.append(Waste({
+                'kg': food.kg,
+                'Type': food.type,
+                'House': self.id,
+                'ed_status': 'Inedible'
+            }))
+            del food
 
     def cook(self):
         kg = 0
@@ -223,13 +262,7 @@ class House():
                     if kcal_today == 0:
                         return 
             else:
-                self.waste({
-                    'kg': food.kg,
-                    'Type': food.type,
-                    'House': self.id
-                })
-                self.fridge.remove(food)
-                del food
+                self.waste(food=food)
         for food in reversed(self.fridge):
             if food.expiration_time > 0:
                 if kcal_today >= food.kcal_kg*food.kg:
@@ -244,15 +277,10 @@ class House():
                 if kcal_today == 0:
                     return 
             else:
-                self.waste({
-                    'kg': food.kg,
-                    'Type': food.type,
-                    'House': self.id
-                })
-                self.fridge.remove(food)
-                del food
+                self.waste(food)
 class Waste():
     def __init__(self, waste_data:dict):
         self.kg = waste_data['kg']
         self.type = waste_data['Type']
         self.house_id = waste_data['House']
+        self.ed_status = waste_data['ed_status']

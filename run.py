@@ -17,10 +17,8 @@ def init(num_of_houses=100):
     global eaten_food
     eaten_food = pd.DataFrame(columns=[
         'Type',
-        'Part of Home-Cooked Meal',
         'kg',
         'kcal',
-        'price',
         'expiration time',
         'House',
         'Day Eaten'
@@ -29,7 +27,7 @@ def init(num_of_houses=100):
     wasted_food = pd.DataFrame(columns=[
         'Type',
         'kg',
-        #'Cooked at home', - to be implemented ln 69,71,72
+        'Ed-Status',
         'House',
         'Day Wasted'
     ])
@@ -47,15 +45,8 @@ def init(num_of_houses=100):
 def run(days=54):
     for day in range(days):
         for house in houses:
-            if day % house.shopping_frequency == 0:
-                house.shop()
-            house.cook()
-            house.eat()
+            house.do_a_day(day=day)
             collect_data(day=day, house= house)
-            for food in house.fridge:
-                food.decay()
-            for food in house.pantry:
-                food.decay()
 
 def collect_data(day:int, house:House):
     # food bought
@@ -81,7 +72,8 @@ def collect_data(day:int, house:House):
         #'kcal', - to be implemented ln 
         #'price', - to be implemented
         'House': house.id,
-        'Day Wasted': day
+        'Day Wasted': day,
+        'Ed-Status': waste.ed_status
         }
         house.waste_bin.remove(waste)
         del waste
@@ -100,6 +92,6 @@ def collect_data(day:int, house:House):
         del food
 
 def data_to_csv(trial=1):
-    bought_food.to_csv(f'bought_food_{trial}.csv')
-    eaten_food.to_csv(f'eaten_food_{trial}.csv')
-    wasted_food.to_csv(f'wasted_food_{trial}.csv')
+    bought_food.to_csv(f'outputs/bought_food_{trial}.csv')
+    eaten_food.to_csv(f'outputs/eaten_food_{trial}.csv')
+    wasted_food.to_csv(f'outputs/wasted_food_{trial}.csv')
