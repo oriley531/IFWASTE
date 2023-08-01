@@ -238,10 +238,10 @@ class House():
             self.kitchen.remove(food)
             del food
         if kg == 0: # only occurs if all the food they grabbed to cook is bad
-            self.eat()
+            self.cook()
             return
         for key, value in composition.items():
-            composition[key] /= kg
+            value /= kg
         self.fridge.append(CookedFood(composition= composition, kg= kg, kcal_per_kg= kcal/kg))
 
     def eat(self):
@@ -261,6 +261,7 @@ class House():
                         food.kg -= kcal_today/food.kcal_kg
                         eaten_food.kg = kcal_today/eaten_food.kcal_kg
                         kcal_today = 0
+                        self.stomach.append(eaten_food)
                     if kcal_today == 0:
                         return 
             else:
@@ -276,6 +277,7 @@ class House():
                     food.kg -= kcal_today/food.kcal_kg
                     eaten_food.kg = kcal_today/eaten_food.kcal_kg
                     kcal_today = 0
+                    self.stomach.append(eaten_food)
                 if kcal_today == 0:
                     return 
             else:
