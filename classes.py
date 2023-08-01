@@ -167,10 +167,11 @@ class House():
             self.pantry.remove(food)
             del food
         if prepped.inedible_parts > 0:
+            # changed all / to * because I messed it up the first time
             in_ed = copy.deepcopy(prepped)
-            in_ed.kg = prepped.kg/prepped.inedible_parts
-            prepped.kg /= (1-prepped.inedible_parts) # remove the inedible parts
-            prepped.serving_size /= (1-prepped.inedible_parts) # adjust the serving size accordingly
+            in_ed.kg *= in_ed.inedible_parts
+            prepped.kg *= (1-prepped.inedible_parts) # remove the inedible parts
+            prepped.serving_size *= (1-prepped.inedible_parts) # adjust the serving size accordingly
             self.waste(food=in_ed)
         self.kitchen.append(prepped) # add the prepped food to be cooked or eaten from the kitchen
 
@@ -198,12 +199,13 @@ class House():
                 del food
             else:
                 for key, value in food.composition.items():
-                    self.waste_bin.append(Waste({
-                        'kg': food.kg*value,
-                        'Type': key,
-                        'House': self.id,
-                        'ed_status': 'Ed-Cooked'
-                    }))
+                    if value > 0:
+                        self.waste_bin.append(Waste({
+                            'kg': food.kg*value,
+                            'Type': key,
+                            'House': self.id,
+                            'ed_status': 'Ed-Cooked'
+                        }))
                 self.fridge.remove(food)
                 del food
         else:
