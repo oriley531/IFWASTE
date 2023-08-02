@@ -31,6 +31,13 @@ def init(num_of_houses=100):
         'House',
         'Day Wasted'
     ])
+    global still_owned
+    still_owned = pd.DataFrame(columns=[
+        'Type',
+        'kg',
+        'kcal',
+        'House'
+        ])
     #----------------------------
     # Create a store and all of the houses
     store = Store()
@@ -91,7 +98,25 @@ def collect_data(day:int, house:House):
         house.stomach.remove(food)
         del food
 
+def collect_still_owned(house:House):
+    for house in houses:
+        for food in house.pantry:
+            still_owned._append_({
+                'Type':food.type,
+                'kg':food.kg,
+                'kcal':food.kcal_kg*food.kg,
+                'House':house.id
+            })
+        for food in house.fridge:
+            still_owned._append_({
+                'Type':food.type,
+                'kg':food.kg,
+                'kcal':food.kcal_kg*food.kg,
+                'House':house.id
+            })
+
 def data_to_csv(trial=1):
     bought_food.to_csv(f'outputs/bought_food_{trial}.csv')
     eaten_food.to_csv(f'outputs/eaten_food_{trial}.csv')
     wasted_food.to_csv(f'outputs/wasted_food_{trial}.csv')
+    still_owned.to_csv(f'outputs/still_owned_{trial}.csv')

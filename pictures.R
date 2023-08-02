@@ -6,6 +6,7 @@ library(conflicted)
 bought <- read.csv("outputs/bought_food_1.csv")
 eaten <- read.csv("outputs/eaten_food_1.csv")
 wasted <- read.csv("outputs/wasted_food_1.csv")
+still <- read.csv("outputs/still_owned_1.csv")
 
 # Make the totals bargraph's
 bought %>%
