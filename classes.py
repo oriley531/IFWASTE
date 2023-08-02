@@ -143,6 +143,7 @@ class House():
         # create a pantry that is a list that can only store Food objects
         self.pantry = [] # stores ingredients
         self.fridge = [] # stores ready-to-eat food
+        self.stomach = [] # stores food that has been eaten
         self.store = store
         self.id = id
         self.waste_bin = []
@@ -186,7 +187,6 @@ class House():
         }
         kcal = 0
         for ingredient in ingredients:
-            self.pantry.remove(ingredient)
             self.prep(ingredient)
             kg += ingredient.kg
             kcal += ingredient.kcal_kg*ingredient.kg
@@ -240,22 +240,32 @@ class House():
 
     def get_ingredients(self):
         ingredients = []
-        for i in range(random.randint(1, 5)):
+        i = 1
+        while i <= random.randint(3, 5):
             if len(self.pantry) == 0:
-                break
+                self.shop()
             else:
-                ingredients.append(self.pantry.pop(random.randint(0, len(self.pantry)-1)))
+                random.shuffle(self.pantry)
+                for item in self.pantry:
+                    if item.expiration_time <= 0:
+                        self.waste(item)
+                        self.pantry.remove(item)
+                    else:
+                        self.pantry.remove(item)
+                        ingredients.append(item)
+                        i += 1
         return ingredients
 
     def eat(self, food: Food, kcal: int):
         if food.type != 'Cooked, Prepped, or Leftovers':
-            if food.kg > kcal/food.kcal_kg:
+            if food.kg*food.kcal_kg > kcal:
                 eaten = copy.deepcopy(food)
                 food.kg -= kcal/food.kcal_kg
                 eaten.kg = kcal/food.kcal_kg
             else:
                 eaten = food
                 self.fridge.remove(food)
+                del food
             self.stomach.append(Eaten({
                 'kg': eaten.kg,
                 'Type': eaten.type,
@@ -263,14 +273,27 @@ class House():
                 'Exp': eaten.expiration_time
             }))
         else:
-            for key, value in food.composition.items():
-                if value > 0:
-                    self.eat(Eaten({
-                        'kg': value*food.kg,
-                        'Type': key,
-                        'House': self.id,
-                        'Exp': food.expiration_time
-                    }))
+            if food.kg*food.kcal_kg > kcal:
+                eaten_kg = kcal/food.kcal_kg
+                food.kg -= eaten_kg
+                for key, value in food.composition.items():
+                    if value > 0:
+                        self.stomach.append(Eaten({
+                            'kg': value*eaten_kg,
+                            'Type': key,
+                            'House': self.id,
+                            'Exp': food.expiration_time
+                        }))
+            else:
+                self.fridge.remove(food)
+                for key, value in food.composition.items():
+                    if value > 0:
+                        self.stomach.append(Eaten({
+                            'kg': value*food.kg,
+                            'Type': key,
+                            'House': self.id,
+                            'Exp': food.expiration_time
+                        }))
 
     def choose_meal(self):
         if len(self.fridge) == 0:
@@ -278,17 +301,23 @@ class House():
         else:
             kcal = self.kcal
             for food in reversed(self.fridge):
-                if kcal <= 0:
-                    break
-                if food.type == 'Store-Prepared Items':
+                if food.expiration_time <= 0:
+                    self.waste(food)
+                    self.fridge.remove(food)
+                elif kcal <= 0:
+                    return
+                elif food.type == 'Store-Prepared Items':
                     self.eat(food, kcal)
                     kcal -= food.kcal_kg*food.kg
                 else:
                     continue
             for food in reversed(self.fridge):
-                if kcal <= 0:
-                    break
-                if food.type == 'Cooked, Prepped, or Leftovers':
+                if food.expiration_time <= 0:
+                    self.waste(food)
+                    self.fridge.remove(food)
+                elif kcal <= 0:
+                    return
+                elif food.type == 'Cooked, Prepped, or Leftovers':
                     self.eat(food, kcal)
                     kcal -= food.kcal_kg*food.kg
                 else:
@@ -325,7 +354,7 @@ class Neighborhood():
         self.store = Store()
         self.houses = []
         for i in range(n_houses):
-            self.houses.append(House(i, self.store))
+            self.houses.append(House(id=i, store=self.store))
         self.wasted_food = pd.DataFrame(columns=[
             'Type',
             'kg',
@@ -355,29 +384,29 @@ class Neighborhood():
     def collect_data(self, day: int):
         for house in self.houses:
             for waste in house.waste_bin:
-                self.wasted_food = self.wasted_food.append({
+                self.wasted_food = self.wasted_food._append({
                     'Type': waste.type,
                     'kg': waste.kg,
                     'Ed-Status': waste.ed_status,
-                    'House': waste.house,
+                    'House': house.id,
                     'Day Wasted': day
                 }, ignore_index=True)
             for eaten in house.stomach:
-                self.eaten_food = self.eaten_food.append({
+                self.eaten_food = self.eaten_food._append({
                     'Type': eaten.type,
                     'kg': eaten.kg,
-                    'House': eaten.house,
+                    'House': house.id,
                     'Day Eaten': day
                 }, ignore_index=True)
-            for bought in house.fridge:
-                self.bought_food = self.bought_food.append({
+            for bought in house.bought_food:
+                self.bought_food = self.bought_food._append({
                     'Type': bought.type,
                     'kg': bought.kg,
-                    'House': bought.house,
+                    'House': house.id,
                     'Day Bought': day
                 }, ignore_index=True)
 
-    def data_to_csv(self, path: str):
-        self.wasted_food.to_csv(path_or_buf=path+'wasted_food_1.csv')
-        self.eaten_food.to_csv(path_or_buf=path+'eaten_food_1.csv')
-        self.bought_food.to_csv(path_or_buf=path+'bought_food_1.csv')
+    def data_to_csv(self):
+        self.wasted_food.to_csv('outputs/wasted_food_1.csv')
+        self.eaten_food.to_csv('outputs/eaten_food_1.csv')
+        self.bought_food.to_csv('outputs/bought_food_1.csv')
