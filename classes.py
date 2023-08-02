@@ -161,7 +161,7 @@ class House():
     def shop(self):
         basket = self.fill_basket()
         for item in basket:
-            self.bought_food.append(item)
+            self.bought_food.append(copy.deepcopy(item))
             if item.type == 'Store-Prepared Items':
                 self.fridge.append(item)
             else:
@@ -374,6 +374,12 @@ class Neighborhood():
             'House',
             'Day Bought'
         ])
+        self.stilled_owned = pd.DataFrame(columns=[
+            'Type',
+            'kg',
+            'House',
+            'Day Bought'
+        ])
 
     def run(self, days=56):
         for day in range(days):
@@ -391,6 +397,8 @@ class Neighborhood():
                     'House': house.id,
                     'Day Wasted': day
                 }, ignore_index=True)
+                house.waste_bin.remove(waste)
+                del waste
             for eaten in house.stomach:
                 self.eaten_food = self.eaten_food._append({
                     'Type': eaten.type,
@@ -398,10 +406,31 @@ class Neighborhood():
                     'House': house.id,
                     'Day Eaten': day
                 }, ignore_index=True)
+                house.stomach.remove(eaten)
+                del eaten
             for bought in house.bought_food:
                 self.bought_food = self.bought_food._append({
                     'Type': bought.type,
                     'kg': bought.kg,
+                    'House': house.id,
+                    'Day Bought': day
+                }, ignore_index=True)
+                house.bought_food.remove(bought)
+                del bought
+
+    def collect_current_food_data(self):
+        for house in self.houses:
+            for food in house.fridge:
+                self.stilled_owned = self.stilled_owned._append({
+                    'Type': food.type,
+                    'kg': food.kg,
+                    'House': house.id,
+                    'Day Bought': day
+                }, ignore_index=True)
+            for food in house.pantry:
+                self.stilled_owned = self.stilled_owned._append({
+                    'Type': food.type,
+                    'kg': food.kg,
                     'House': house.id,
                     'Day Bought': day
                 }, ignore_index=True)
@@ -410,3 +439,4 @@ class Neighborhood():
         self.wasted_food.to_csv('outputs/wasted_food_1.csv')
         self.eaten_food.to_csv('outputs/eaten_food_1.csv')
         self.bought_food.to_csv('outputs/bought_food_1.csv')
+        self.stilled_owned.to_csv('outputs/still_owned_1.csv')
