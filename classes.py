@@ -107,7 +107,7 @@ class House():
         pass
     def shop(self):
         pass
-    def waste(self):
+    def throw_away(self):
         pass
 
 class Food():
@@ -128,26 +128,48 @@ class Food():
         pass
 class CookedFood(Food):
     def __init__(self, ingredients:list):
-        pass
+        self.ingredients = ingredients
+        self.type = 'Cooked, Prepped, Leftovers'
+        kg = 0
+        price = 0
+        for ingredient in ingredients:
+            self.kg += ingredient.kg
+            self.servings += ingredient.servings
+            self.exp_time = min(self.exp_time, ingredient.exp_time)
+            price += ingredient.price_kg*ingredient.kg
+            kcal += ingredient.kcal_kg*ingredient.kg
+        self.price_kg = price/self.kg
+        self.kcal_kg = kcal/self.kg
 class Waste():
     def __init__(self, food:Food):
-        if not isinstance(CookedFood):
+        if self.type != 'Cooked, Prepped, Leftovers':
             self.type = food.type
             self.kg = food.kg*food.inedible_parts
             self.servings = food.servings*food.inedible_parts
-            self.exp_time = food.exp_time
             self.price = food.price_kg*food.kg
-            self.serving_size = self.kg/self.servings
             self.kcal = food.kcal_kg*food.kg
+            self.status = 'Cooked' if food.type == 'Store-Prepared Items' else'Unprepared'
         else:
             for ingredient in food.ingredients:
                 self.type = ingredient.type
                 self.kg = ingredient.kg*ingredient.inedible_parts
                 self.servings = ingredient.servings*ingredient.inedible_parts
-                self.exp_time = ingredient.exp_time
                 self.price = ingredient.price_kg*ingredient.kg
-                self.serving_size = self.kg/self.servings
                 self.kcal = ingredient.kcal_kg*ingredient.kg
+                self.status = 'Cooked'
+class Inedible(Waste):
+    def __init__(self, food:Food):
+        # creates a waste from the inedible parts of a food
+        self.type = food.type
+        self.kg = food.kg*food.inedible_parts
+        self.servings = 0
+        self.price = food.price_kg*food.kg
+        self.kcal = 0
+        self.status = 'Inedible'
+        food.kcal_kg /= (1-food.inedible_parts) # assume inedible parts have no calories
+        food.kg -= self.kg
+        food.price -= self.price
+        food.serving_size *= (1-food.inedible_parts)
 
 class Neighborhood():
     def __init__(self, num_houses= 10):
