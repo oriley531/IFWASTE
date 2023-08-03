@@ -124,8 +124,43 @@ class Food():
     def decay(self):
         if self.frozen == False:
             self.exp_time -= 1
-    def split(self) -> (Food, Waste):
-        pass
+    def portion(self, servings: int = None, kcal: float = None) -> Food:
+        if servings == None and kcal == None:
+            raise ValueError('Must specify either servings or kcal')
+        elif servings != None and kcal != None:
+            raise ValueError('Must specify either servings or kcal, not both')
+        elif servings != None:
+            if servings > self.servings:
+                servings = self.servings
+            new_food = Food({
+                'Type': self.type,
+                'kg': servings*self.serving_size,
+                'Expiration Min.': self.exp_time,
+                'Expiration Max.': self.exp_time,
+                'Price': self.price_kg*servings*self.serving_size,
+                'Servings': servings,
+                'kcal_kg': self.kcal_kg,
+                'Inedible Parts': self.inedible_parts
+            })
+            self.kg -= new_food.kg
+            self.servings -= new_food.servings
+            return new_food
+        elif kcal != None:
+            if kcal > self.kcal_kg*self.kg:
+                kcal = self.kcal_kg*self.kg
+            new_food = Food({
+                'Type': self.type,
+                'kg': kcal/self.kcal_kg,
+                'Expiration Min.': self.exp_time,
+                'Expiration Max.': self.exp_time,
+                'Price': self.price_kg*kcal/self.kcal_kg,
+                'Servings': (kcal/self.kcal_kg)/self.serving_size,
+                'kcal_kg': self.kcal_kg,
+                'Inedible Parts': self.inedible_parts
+            })
+            self.kg -= new_food.kg
+            self.servings -= new_food.servings
+            return new_food
 class CookedFood(Food):
     def __init__(self, ingredients:list):
         self.ingredients = ingredients
@@ -140,6 +175,22 @@ class CookedFood(Food):
             kcal += ingredient.kcal_kg*ingredient.kg
         self.price_kg = price/self.kg
         self.kcal_kg = kcal/self.kg
+    def portion(self, kcal: float ) -> CookedFood:
+        new_ingredients = []
+        if kcal > self.kcal_kg*self.kg:
+            kcal = self.kcal_kg*self.kg
+            for ingredient in self.ingredients:
+                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg) # take all of the ingredient
+                self.ingredients.remove(ingredient)
+                new_ingredients.append(new_food)
+        else:
+            # ratio to take the proper amount from each ingredient
+            kcal_ratio = kcal/(self.kcal_kg*self.kg)
+            for ingredient in self.ingredients:
+                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg*kcal_ratio) # take the proper amount of each ingredient
+        new_cfood = CookedFood(ingredients=new_ingredients)
+        self.kg -= new_food.kg
+        return new_cfood
 class Waste():
     def __init__(self, food:Food):
         if self.type != 'Cooked, Prepped, Leftovers':
@@ -166,10 +217,11 @@ class Inedible(Waste):
         self.price = food.price_kg*food.kg
         self.kcal = 0
         self.status = 'Inedible'
-        food.kcal_kg /= (1-food.inedible_parts) # assume inedible parts have no calories
+        # update the food
         food.kg -= self.kg
         food.price -= self.price
         food.serving_size *= (1-food.inedible_parts)
+        food.kcal_kg /= (1-food.inedible_parts) # assume inedible parts have no calories
 
 class Neighborhood():
     def __init__(self, num_houses= 10):
