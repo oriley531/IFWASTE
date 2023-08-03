@@ -124,7 +124,7 @@ class Food():
     def decay(self):
         if self.frozen == False:
             self.exp_time -= 1
-    def portion(self, servings: int = None, kcal: float = None) -> Food:
+    def portion(self, servings: int = None, kcal: float = None):
         if servings == None and kcal == None:
             raise ValueError('Must specify either servings or kcal')
         elif servings != None and kcal != None:
@@ -161,21 +161,26 @@ class Food():
             self.kg -= new_food.kg
             self.servings -= new_food.servings
             return new_food
+    def throw(self):
+        # return a list of waste
+        return [Waste(self)]
 class CookedFood(Food):
     def __init__(self, ingredients:list):
         self.ingredients = ingredients
         self.type = 'Cooked, Prepped, Leftovers'
-        kg = 0
+        self.kg = 0
         price = 0
+        kcal = 0
+        self.scraps = []
         for ingredient in ingredients:
+            if ingredient.inedible_parts > 0 : 
+                self.scraps.append(Inedible(ingredient))
             self.kg += ingredient.kg
-            self.servings += ingredient.servings
-            self.exp_time = min(self.exp_time, ingredient.exp_time)
             price += ingredient.price_kg*ingredient.kg
             kcal += ingredient.kcal_kg*ingredient.kg
         self.price_kg = price/self.kg
         self.kcal_kg = kcal/self.kg
-    def portion(self, kcal: float ) -> CookedFood:
+    def portion(self, kcal: float ):
         new_ingredients = []
         if kcal > self.kcal_kg*self.kg:
             kcal = self.kcal_kg*self.kg
@@ -188,26 +193,27 @@ class CookedFood(Food):
             kcal_ratio = kcal/(self.kcal_kg*self.kg)
             for ingredient in self.ingredients:
                 new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg*kcal_ratio) # take the proper amount of each ingredient
+                new_ingredients.append(new_food)
         new_cfood = CookedFood(ingredients=new_ingredients)
         self.kg -= new_food.kg
         return new_cfood
+    def throw(self):
+        # return a list of waste
+        waste_list = []
+        for ingredient in self.ingredients:
+            waste_list.append(Waste(food=ingredient, status='Cooked'))
+        return waste_list
 class Waste():
-    def __init__(self, food:Food):
-        if self.type != 'Cooked, Prepped, Leftovers':
-            self.type = food.type
-            self.kg = food.kg*food.inedible_parts
-            self.servings = food.servings*food.inedible_parts
-            self.price = food.price_kg*food.kg
-            self.kcal = food.kcal_kg*food.kg
+    def __init__(self, food:Food, status:str = None):
+        self.type = food.type
+        self.kg = food.kg
+        self.servings = food.servings
+        self.price = food.price_kg*food.kg
+        self.kcal = food.kcal_kg*food.kg
+        if status == None:
             self.status = 'Cooked' if food.type == 'Store-Prepared Items' else'Unprepared'
         else:
-            for ingredient in food.ingredients:
-                self.type = ingredient.type
-                self.kg = ingredient.kg*ingredient.inedible_parts
-                self.servings = ingredient.servings*ingredient.inedible_parts
-                self.price = ingredient.price_kg*ingredient.kg
-                self.kcal = ingredient.kcal_kg*ingredient.kg
-                self.status = 'Cooked'
+            self.status = status
 class Inedible(Waste):
     def __init__(self, food:Food):
         # creates a waste from the inedible parts of a food
@@ -219,9 +225,9 @@ class Inedible(Waste):
         self.status = 'Inedible'
         # update the food
         food.kg -= self.kg
-        food.price -= self.price
         food.serving_size *= (1-food.inedible_parts)
         food.kcal_kg /= (1-food.inedible_parts) # assume inedible parts have no calories
+        print(f'Ined of {food.type} is {self.kg} kg')
 
 class Neighborhood():
     def __init__(self, num_houses= 10):
@@ -238,3 +244,46 @@ class Neighborhood():
         pass
     def data_to_csv(self):
         pass
+
+# a function that tests all of the methods in food and cookedfood for mass conservation
+def test_mass_conservation():
+    # make some food and cookedfood
+    food1 = Food({
+        'Type': 'Store-Prepared Items',
+        'kg': 0.12*6,
+        'Expiration Min.': 4,
+        'Expiration Max.': 6,
+        'Price': 10.99,
+        'Servings': 6,
+        'kcal_kg': 2790,
+        'Inedible Parts': 0
+    })
+    food2 = Food({
+        'Type': 'Meat & Fish',
+        'kg': 0.09*6,
+        'Expiration Min.': 4,
+        'Expiration Max.': 6,
+        'Price': 10.99,
+        'Servings': 6,
+        'kcal_kg': 2240,
+        'Inedible Parts': 0.1
+    })
+    print(f'food1 - {food1.kg}')
+    print(f'food2 - {food2.kg}')
+    food_portion = food1.portion(servings=2)
+    print(f'food1 after 2 servings taken - {food1.kg}')
+    print(f'portion taken - {food_portion.kg}')
+    cfood = CookedFood([food1, food2])
+    print(f'cfood - {cfood.kg}')
+    for scrap in cfood.scraps:
+        print(f'{scrap.type} - {scrap.kg}')
+    # test the portion method
+    cfood_portion = cfood.portion(kcal=224)
+    print(f'cfood left - {cfood.kg}')
+    print(f'cfood taken - {cfood_portion.kg}')
+    waste = cfood_portion.throw()
+    for scrap in waste:
+        print(f'waste - {scrap.type} - {scrap.kg}')
+
+
+test_mass_conservation()
