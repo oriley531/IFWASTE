@@ -139,6 +139,15 @@ class Waste():
             self.price = food.price_kg*food.kg
             self.serving_size = self.kg/self.servings
             self.kcal = food.kcal_kg*food.kg
+        else:
+            for ingredient in food.ingredients:
+                self.type = ingredient.type
+                self.kg = ingredient.kg*ingredient.inedible_parts
+                self.servings = ingredient.servings*ingredient.inedible_parts
+                self.exp_time = ingredient.exp_time
+                self.price = ingredient.price_kg*ingredient.kg
+                self.serving_size = self.kg/self.servings
+                self.kcal = ingredient.kcal_kg*ingredient.kg
 
 class Neighborhood():
     def __init__(self, num_houses= 10):
