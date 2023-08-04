@@ -1,7 +1,9 @@
 import random 
 import copy
 import pandas as pd
-
+'''Trying to find why it's dividing by 0,
+I think its because of ingredients returning an empty list sometimes but,
+I am unsure why that is happening'''
 class Store():
     def __init__(self):
         self.shelves = pd.DataFrame(columns= [
@@ -87,35 +89,29 @@ class Store():
             'Inedible Parts': inedible_parts
             }
         return new_food
-class House():
+class Person():
     def __init__(self):
-        pass
-    def do_a_day(self):
-        pass
-    def cook(self):
-        pass
-    def prep(self):
-        pass
-    def choose_meal(self):
-        pass
-    def eat(self):
-        pass
-    def get_recipe(self) -> dict:
-        # return a dictionary of ideal ingredients and servings
-        pass
-    def prep_ingredients(self) -> list:
-        pass
-    def shop(self):
-        pass
-    def throw_away(self):
-        pass
-
+        self.age = random.randint(18, 65)
+        self.gender = random.randint(0, 1) #1 is female
+        self.kcal = random.gauss(2000, 500) - 500*self.gender
+    def old(self):
+        self.age += 1
+        if self.age <= 18:
+            self.kcal += 50 + 10*self.gender
+        elif self.age > 30 and self.age <= 40:
+            self.kcal -= 50 + 10*self.gender
+class Child(Person):
+    def __init__(self, parent: Person):
+        self.age = random.randint(1, 18)
+        self.kcal = random.gauss(1200, 200) + self.age*50
+        self.gender = random.randint(0,1) #1 is female
+        self.parent = parent
 class Food():
     def __init__(self, food_data:dict):
         self.type = food_data['Type']
         self.kg = food_data['kg']
         self.servings = food_data['Servings']
-        self.exp_time = random.randint(food_data['Expiration Min.'], food_data['Expiration Max.'])
+        self.exp = random.randint(food_data['Expiration Min.'], food_data['Expiration Max.'])
         self.price_kg = food_data['Price']/self.kg
         self.inedible_parts = food_data['Inedible Parts']
         self.frozen = False
@@ -123,7 +119,7 @@ class Food():
         self.kcal_kg = food_data['kcal_kg']
     def decay(self):
         if self.frozen == False:
-            self.exp_time -= 1
+            self.exp -= 1
     def portion(self, servings: int = None, kcal: float = None):
         if servings == None and kcal == None:
             raise ValueError('Must specify either servings or kcal')
@@ -135,8 +131,8 @@ class Food():
             new_food = Food({
                 'Type': self.type,
                 'kg': servings*self.serving_size,
-                'Expiration Min.': self.exp_time,
-                'Expiration Max.': self.exp_time,
+                'Expiration Min.': self.exp,
+                'Expiration Max.': self.exp,
                 'Price': self.price_kg*servings*self.serving_size,
                 'Servings': servings,
                 'kcal_kg': self.kcal_kg,
@@ -151,8 +147,8 @@ class Food():
             new_food = Food({
                 'Type': self.type,
                 'kg': kcal/self.kcal_kg,
-                'Expiration Min.': self.exp_time,
-                'Expiration Max.': self.exp_time,
+                'Expiration Min.': self.exp,
+                'Expiration Max.': self.exp,
                 'Price': self.price_kg*kcal/self.kcal_kg,
                 'Servings': (kcal/self.kcal_kg)/self.serving_size,
                 'kcal_kg': self.kcal_kg,
@@ -171,7 +167,10 @@ class CookedFood(Food):
         self.kg = 0
         price = 0
         kcal = 0
+        self.frozen = False
         self.scraps = []
+        self.inedible_parts = 0
+        self.exp = random.randint(4,7)
         for ingredient in ingredients:
             if ingredient.inedible_parts > 0 : 
                 self.scraps.append(Inedible(ingredient))
@@ -227,63 +226,216 @@ class Inedible(Waste):
         food.kg -= self.kg
         food.serving_size *= (1-food.inedible_parts)
         food.kcal_kg /= (1-food.inedible_parts) # assume inedible parts have no calories
-        print(f'Ined of {food.type} is {self.kg} kg')
+class House():
+    def __init__(self, store: Store, id: int):
+        self.ppl = self.gen_ppl()
+        self.kcal = sum([person.kcal for person in self.ppl])
+        self.pantry = []
+        self.fridge = []
+        self.eaten = []
+        self.trash = []
+        self.bought = []
+        self.shopping_frequency = random.randint(1, 7)
+        self.store = store
+        self.id = id
+        #self.time = [2, 2, 2, 2, 2, 2, 2] free time per day
+        #self.budget = 1000 # per month
+    def gen_ppl(self):
+        # currently not generating children
+        ppl = []
+        for i in range(random.randint(1, 5)):
+            p = Person()
+            ppl.append(p)
+        return ppl
+    def do_a_day(self, day: int):
+        if day % self.shopping_frequency == 0:
+            self.shop()
+        self.cook()
+        self.what_to_eat()
+        for food in self.fridge:
+            food.decay()
+            if food.exp <= 0:
+                self.throw_away(food)
+        for food in self.pantry:
+            food.decay()
+            if food.exp <= 0:
+                self.throw_away(food)
+    def cook(self):
+        ingredients = self.get_recipe()
+        meal = CookedFood(ingredients=ingredients)
+        self.fridge.append(meal)
+        for scrap in meal.scraps:
+            self.trash.append(scrap)
+            meal.scraps.remove(scrap)
+    def what_to_eat(self):
+        kcal = self.kcal
+        for food in reversed(self.fridge):
+            food_kcal = food.kg*food.kcal_kg
+            self.eat(food=food, kcal=kcal)
+            kcal -= food_kcal
+            if kcal <= 0:
+                return
+    def eat(self, food: Food, kcal: float):
+        eaten_food = food.portion(kcal=kcal)
+        if food.kg <= 0:
+            self.fridge.remove(food)
+        if eaten_food.kg*eaten_food.kcal_kg > kcal:
+            self.fridge.remove(food)
+        if eaten_food.type == 'Cooked, Prepped, Leftovers':
+            for ingredient in eaten_food.ingredients:
+                self.eaten.append(ingredient)
+        else:
+            self.eaten.append(eaten_food)
+    def get_recipe(self):
+        # return a random list of ingredients from the pantry
+        if len(self.pantry) < 5:
+            self.shop()
+        ingredients = []
+        servings = random.randint(4, 7)
+        for i in range(random.randint(2, 5)):
+            main_item = random.choice(self.pantry)
+            new_item = main_item.portion(servings=servings)
+            if main_item.kg <= 0:
+                self.pantry.remove(main_item)
+            ingredients.append(new_item)
+        return ingredients
+    def shop(self):
+        #buy random food from the store
+        basket = self.store.shelves.sample(n=len(self.ppl)*self.shopping_frequency, replace=True)
+        for i in range(len(basket)):
+            item_info = basket.iloc[i].to_dict()
+            food = Food(item_info)
+            self.bought.append(copy.deepcopy(food))
+            if food.type == 'Store-Prepared Items':
+                self.fridge.append(food)
+            else:
+                self.pantry.append(food)
+    def throw_away(self, food: Food):
+        if food in self.pantry:
+            self.pantry.remove(food)
+        elif food in self.fridge:
+            self.fridge.remove(food)
+        for trash in food.throw():
+            self.trash.append(trash)
 
 class Neighborhood():
     def __init__(self, num_houses= 10):
-        houses = []
+        self.houses = []
+        store = Store()
         for i in range(num_houses):
-            houses.append(House())
+            self.houses.append(House(store=store, id = i))
+        self.bought = pd.DataFrame(columns=[
+            'House',
+            'Day Bought',
+            'Type',
+            'kg',
+            'Price',
+            'Servings',
+            'kcal',
+            'Exp'
+        ])
+        self.eaten = pd.DataFrame(columns=[
+            'House',
+            'Day Eaten',
+            'Type',
+            'kg',
+            'Price',
+            'Servings',
+            'kcal',
+            'Exp'
+        ])
+        self.wasted = pd.DataFrame(columns=[
+            'House',
+            'Day Wasted',
+            'Type',
+            'kg',
+            'Price',
+            'Servings',
+            'kcal',
+            'Status'
+        ])
+        self.still_have = pd.DataFrame(columns=[
+            'House',
+            'Type',
+            'kg',
+            'Price',
+            'Servings',
+            'kcal',
+            'Exp'
+        ])
     def run(self, days= 365):
         for i in range(days):
-            for house in houses:
-                house.do_a_day()
-    def collect_data(self):
-        pass
-    def get_storage(self):
-        pass
+            for house in self.houses:
+                house.do_a_day(day=i)
+                self.collect_data(house=house, day=i)
+        for house in houses:
+            self.collect_still_have(house=house)
+    def collect_data(self, house: House, day: int):
+        for food in house.bought:
+            self.bought._append({
+                'House': house.id,
+                'Day Bought': day,
+                'Type': food.type,
+                'kg': food.kg,
+                'Price': food.price_kg*food.kg,
+                'Servings': food.servings,
+                'kcal': food.kcal_kg*food.kg,
+                'Exp': food.exp
+            }, ignore_index=True)
+            house.bought.remove(food)
+        for food in house.eaten:
+            self.eaten._append({
+                'House': house.id,
+                'Day Eaten': day,
+                'Type': food.type,
+                'kg': food.kg,
+                'Price': food.price_kg*food.kg,
+                'Servings': food.servings,
+                'kcal': food.kcal_kg*food.kg,
+                'Exp': food.exp
+            }, ignore_index=True)
+            house.eaten.remove(food)
+        for waste in house.trash:
+            self.wasted._append({
+                'House': house.id,
+                'Day Wasted': day,
+                'Type': waste.type,
+                'kg': waste.kg,
+                'Price': waste.price,
+                'Servings': waste.servings,
+                'kcal': waste.kcal,
+                'Status': waste.status
+            }, ignore_index=True)
+            house.trash.remove(waste)
+    def get_storage(self, house: House):
+        for food in house.fridge:
+            self.still_have._append({
+                'House': house.id,
+                'Type': food.type,
+                'kg': food.kg,
+                'Price': food.price_kg*food.kg,
+                'Servings': food.servings,
+                'kcal': food.kcal_kg*food.kg,
+                'Exp': food.exp
+            }, ignore_index=True)
+            house.fridge.remove(food)
+        for food in house.pantry:
+            self.still_have._append({
+                'House': house.id,
+                'Type': food.type,
+                'kg': food.kg,
+                'Price': food.price_kg*food.kg,
+                'Servings': food.servings,
+                'kcal': food.kcal_kg*food.kg,
+                'Exp': food.exp
+            }, ignore_index=True)
+            house.pantry.remove(food)
     def data_to_csv(self):
-        pass
+        self.bought.to_csv('outputs/bought.csv')
+        self.eaten.to_csv('outputs/eaten.csv')
+        self.wasted.to_csv('outputs/wasted.csv')
+        self.still_have.to_csv('outputs/still_have.csv')
 
-# a function that tests all of the methods in food and cookedfood for mass conservation
-def test_mass_conservation():
-    # make some food and cookedfood
-    food1 = Food({
-        'Type': 'Store-Prepared Items',
-        'kg': 0.12*6,
-        'Expiration Min.': 4,
-        'Expiration Max.': 6,
-        'Price': 10.99,
-        'Servings': 6,
-        'kcal_kg': 2790,
-        'Inedible Parts': 0
-    })
-    food2 = Food({
-        'Type': 'Meat & Fish',
-        'kg': 0.09*6,
-        'Expiration Min.': 4,
-        'Expiration Max.': 6,
-        'Price': 10.99,
-        'Servings': 6,
-        'kcal_kg': 2240,
-        'Inedible Parts': 0.1
-    })
-    print(f'food1 - {food1.kg}')
-    print(f'food2 - {food2.kg}')
-    food_portion = food1.portion(servings=2)
-    print(f'food1 after 2 servings taken - {food1.kg}')
-    print(f'portion taken - {food_portion.kg}')
-    cfood = CookedFood([food1, food2])
-    print(f'cfood - {cfood.kg}')
-    for scrap in cfood.scraps:
-        print(f'{scrap.type} - {scrap.kg}')
-    # test the portion method
-    cfood_portion = cfood.portion(kcal=224)
-    print(f'cfood left - {cfood.kg}')
-    print(f'cfood taken - {cfood_portion.kg}')
-    waste = cfood_portion.throw()
-    for scrap in waste:
-        print(f'waste - {scrap.type} - {scrap.kg}')
-
-
-test_mass_conservation()
+neighborhood = Neighborhood(num_houses=1)
+neighborhood.run(days=56)
+neighborhood.data_to_csv()
