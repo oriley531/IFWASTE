@@ -120,7 +120,11 @@ class Food():
     def decay(self):
         if self.frozen == False:
             self.exp -= 1
-    def portion(self, servings: int = None, kcal: float = None):
+    def portion(self, f_list: list, 
+        to_list: list = None, 
+        servings: int = None, 
+        kcal: float = None):
+        to_list = f_list if to_list == None else to_list
         if servings == None and kcal == None:
             raise ValueError('Must specify either servings or kcal')
         elif servings != None and kcal != None:
@@ -140,7 +144,7 @@ class Food():
             })
             self.kg -= new_food.kg
             self.servings -= new_food.servings
-            return new_food
+            to_list.append(new_food)
         elif kcal != None:
             if kcal > self.kcal_kg*self.kg:
                 kcal = self.kcal_kg*self.kg
@@ -156,7 +160,9 @@ class Food():
             })
             self.kg -= new_food.kg
             self.servings -= new_food.servings
-            return new_food
+            to_list.append(new_food)
+        if self.kg <= 0.001 or self.servings <= 0.001:
+            f_list.remove(self)
     def throw(self):
         # return a list of waste
         return [Waste(self)]
@@ -164,6 +170,7 @@ class CookedFood(Food):
     def __init__(self, ingredients:list):
         self.ingredients = ingredients
         self.type = 'Cooked, Prepped, Leftovers'
+        self.servings = max([ingredient.servings for ingredient in ingredients])
         self.kg = 0
         price = 0
         kcal = 0
@@ -179,23 +186,25 @@ class CookedFood(Food):
             kcal += ingredient.kcal_kg*ingredient.kg
         self.price_kg = price/self.kg
         self.kcal_kg = kcal/self.kg
-    def portion(self, kcal: float ):
+        self.serving_size = self.kg/self.servings
+    def portion(self, kcal: float, f_list: list, to_list: list = None ):
         new_ingredients = []
         if kcal > self.kcal_kg*self.kg:
             kcal = self.kcal_kg*self.kg
             for ingredient in self.ingredients:
-                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg) # take all of the ingredient
+                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg, f_list= self.ingredients, to_list=new_ingredients) # take all of the ingredient
                 self.ingredients.remove(ingredient)
                 new_ingredients.append(new_food)
         else:
             # ratio to take the proper amount from each ingredient
             kcal_ratio = kcal/(self.kcal_kg*self.kg)
             for ingredient in self.ingredients:
-                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg*kcal_ratio) # take the proper amount of each ingredient
-                new_ingredients.append(new_food)
+                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg*kcal_ratio, f_list = self.ingredients, to_list= new_ingredients) # take the proper amount of each ingredient
         new_cfood = CookedFood(ingredients=new_ingredients)
-        self.kg -= new_food.kg
-        return new_cfood
+        self.kg -= new_cfood.kg
+        to_list.append(new_cfood)
+        if self.kg <= 0.001 or self.servings <= 0.001:
+            f_list.remove(self)
     def throw(self):
         # return a list of waste
         waste_list = []
@@ -271,34 +280,25 @@ class House():
             meal.scraps.remove(scrap)
     def what_to_eat(self):
         kcal = self.kcal
-        for food in reversed(self.fridge):
-            food_kcal = food.kg*food.kcal_kg
-            self.eat(food=food, kcal=kcal)
-            kcal -= food_kcal
+        for food in self.fridge:
             if kcal <= 0:
-                return
+                break
+            kcal -= self.eat(food, kcal)
     def eat(self, food: Food, kcal: float):
-        eaten_food = food.portion(kcal=kcal)
-        if food.kg <= 0:
-            self.fridge.remove(food)
-        if eaten_food.kg*eaten_food.kcal_kg > kcal:
-            self.fridge.remove(food)
-        if eaten_food.type == 'Cooked, Prepped, Leftovers':
-            for ingredient in eaten_food.ingredients:
-                self.eaten.append(ingredient)
+        if food.kcal_kg*food.kg > kcal:
+            food.portion(kcal=kcal, f_list=self.fridge, to_list=self.eaten)
+            return kcal
         else:
-            self.eaten.append(eaten_food)
+            food.portion(kcal=food.kcal_kg*food.kg, f_list=self.fridge, to_list=self.eaten)
+            return food.kcal_kg*food.kg
     def get_recipe(self):
-        # return a random list of ingredients from the pantry
+        if len(self.pantry) < 5:
+            self.shop()
         ingredients = []
         servings = random.randint(4, 7)
-        item_num = random.randint(3,5)
-        random.shuffle(self.pantry)
-        for ingredient in self.pantry:
-            if ingredient.servings <= 0.01 or ingredient.kg <= 0.001:
-                self.pantry.remove(ingredient)
-            else:
-                ingredients.append(ingredient)
+        for i in range(5):
+            item = random.choice(self.pantry)
+            item.portion(servings=servings, f_list=self.pantry, to_list=ingredients)
         return ingredients
     def shop(self):
         #buy random food from the store
