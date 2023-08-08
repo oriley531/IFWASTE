@@ -252,12 +252,14 @@ class House():
             self.shop()
         self.cook()
         self.what_to_eat()
+        self.decay_food()
+    def decay_food(self):
         for food in self.fridge:
-            food.decay()
+            food.exp -= 1
             if food.exp <= 0:
                 self.throw_away(food)
         for food in self.pantry:
-            food.decay()
+            food.exp -= 1
             if food.exp <= 0:
                 self.throw_away(food)
     def cook(self):
@@ -288,16 +290,15 @@ class House():
             self.eaten.append(eaten_food)
     def get_recipe(self):
         # return a random list of ingredients from the pantry
-        if len(self.pantry) < 5:
-            self.shop()
         ingredients = []
         servings = random.randint(4, 7)
-        for i in range(random.randint(2, 5)):
-            main_item = random.choice(self.pantry)
-            new_item = main_item.portion(servings=servings)
-            if main_item.kg <= 0:
-                self.pantry.remove(main_item)
-            ingredients.append(new_item)
+        item_num = random.randint(3,5)
+        random.shuffle(self.pantry)
+        for ingredient in self.pantry:
+            if ingredient.servings <= 0.01 or ingredient.kg <= 0.001:
+                self.pantry.remove(ingredient)
+            else:
+                ingredients.append(ingredient)
         return ingredients
     def shop(self):
         #buy random food from the store
