@@ -170,7 +170,7 @@ class CookedFood(Food):
     def __init__(self, ingredients:list):
         self.ingredients = ingredients
         self.type = 'Cooked, Prepped, Leftovers'
-        self.servings = max([ingredient.servings for ingredient in ingredients])
+        self.servings = max([ingredient.servings for ingredient in self.ingredients])
         self.kg = 0
         price = 0
         kcal = 0
@@ -191,20 +191,16 @@ class CookedFood(Food):
         new_ingredients = []
         if kcal > self.kcal_kg*self.kg:
             kcal = self.kcal_kg*self.kg
-            for ingredient in self.ingredients:
-                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg, f_list= self.ingredients, to_list=new_ingredients) # take all of the ingredient
-                self.ingredients.remove(ingredient)
-                new_ingredients.append(new_food)
+            f_list.remove(self)
+            to_list.append(self)
         else:
             # ratio to take the proper amount from each ingredient
             kcal_ratio = kcal/(self.kcal_kg*self.kg)
             for ingredient in self.ingredients:
                 new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg*kcal_ratio, f_list = self.ingredients, to_list= new_ingredients) # take the proper amount of each ingredient
-        new_cfood = CookedFood(ingredients=new_ingredients)
-        self.kg -= new_cfood.kg
-        to_list.append(new_cfood)
-        if self.kg <= 0.001 or self.servings <= 0.001:
-            f_list.remove(self)
+            new_cfood = CookedFood(ingredients=new_ingredients)
+            self.kg -= new_cfood.kg
+            to_list.append(new_cfood)
     def throw(self):
         # return a list of waste
         waste_list = []
@@ -369,7 +365,7 @@ class Neighborhood():
             for house in self.houses:
                 house.do_a_day(day=i)
                 self.collect_data(house=house, day=i)
-        for house in houses:
+        for house in self.houses:
             self.collect_still_have(house=house)
     def collect_data(self, house: House, day: int):
         for food in house.bought:
