@@ -120,7 +120,7 @@ class Food():
     def decay(self):
         if self.frozen == False:
             self.exp -= 1
-    def portion(self, f_list: list, 
+    def split(self, f_list: list, 
         to_list: list = None, 
         servings: int = None, 
         kcal: float = None):
@@ -175,19 +175,16 @@ class CookedFood(Food):
         price = 0
         kcal = 0
         self.frozen = False
-        self.scraps = []
         self.inedible_parts = 0
         self.exp = random.randint(4,7)
         for ingredient in ingredients:
-            if ingredient.inedible_parts > 0 : 
-                self.scraps.append(Inedible(ingredient))
             self.kg += ingredient.kg
             price += ingredient.price_kg*ingredient.kg
             kcal += ingredient.kcal_kg*ingredient.kg
         self.price_kg = price/self.kg
         self.kcal_kg = kcal/self.kg
         self.serving_size = self.kg/self.servings
-    def portion(self, kcal: float, f_list: list, to_list: list = None ):
+    def split(self, kcal: float, f_list: list, to_list: list = None ):
         new_ingredients = []
         if kcal > self.kcal_kg*self.kg:
             kcal = self.kcal_kg*self.kg
@@ -207,18 +204,7 @@ class CookedFood(Food):
         for ingredient in self.ingredients:
             waste_list.append(Waste(food=ingredient, status='Cooked'))
         return waste_list
-class Waste():
-    def __init__(self, food:Food, status:str = None):
-        self.type = food.type
-        self.kg = food.kg
-        self.servings = food.servings
-        self.price = food.price_kg*food.kg
-        self.kcal = food.kcal_kg*food.kg
-        if status == None:
-            self.status = 'Cooked' if food.type == 'Store-Prepared Items' else'Unprepared'
-        else:
-            self.status = status
-class Inedible(Waste):
+class Inedible():
     def __init__(self, food:Food):
         # creates a waste from the inedible parts of a food
         self.type = food.type
@@ -258,6 +244,20 @@ class House():
         self.cook()
         self.what_to_eat()
         self.decay_food()
+    def what_to_buy(self):
+        # picks randomly currently
+        basket = self.store.shelves.sample(n=2*self.shopping_frequency, replace=True)
+        return basket
+    def shop(self):
+        basket = self.what_to_buy()
+        for i in range(len(basket)):
+            item_info = basket.iloc[i].to_dict()
+            food = Food(item_info)
+            self.store.inventory.append(copy.deepcopy(food))
+            if food.type == 'Store-Prepared Items':
+                self.fridge.append(food)
+            else:
+                self.pantry.append(food)
     def decay_food(self):
         for food in self.fridge:
             food.exp -= 1
@@ -267,13 +267,33 @@ class House():
             food.exp -= 1
             if food.exp <= 0:
                 self.throw_away(food)
+    def throw_away(self, food:Food):
+        if food in self.pantry:
+            self.pantry.remove(food)
+        if food in self.fridge:
+            self.fridge.remove(food)
+        self.trash.append(food)
+    def what_to_cook(self):
+        # randomly pick 5 ingredients
+        if len(self.pantry) < 5:
+            self.shop()
+        ingredients = []
+        servings = random.randint(4, 7)
+        for i in range(5):
+            item = random.choice(self.pantry)
+            item.split(servings=servings, f_list=self.pantry, to_list=ingredients)
+        if len(ingredients)+1 < 5:
+            raise Exception("No empty ingredients list")
+        return ingredients
+    def prep(self, food:Food):
+            if ingredient.inedible_parts > 0 : 
+                scraps = Inedible(food=food)
     def cook(self):
-        ingredients = self.get_recipe()
+        ingredients = self.what_to_cook
+        for ingredient in ingredients:
+            self.prep(ingredient)
         meal = CookedFood(ingredients=ingredients)
         self.fridge.append(meal)
-        for scrap in meal.scraps:
-            self.trash.append(scrap)
-            meal.scraps.remove(scrap)
     def what_to_eat(self):
         kcal = self.kcal
         for food in self.fridge:
@@ -282,38 +302,11 @@ class House():
             kcal -= self.eat(food, kcal)
     def eat(self, food: Food, kcal: float):
         if food.kcal_kg*food.kg > kcal:
-            food.portion(kcal=kcal, f_list=self.fridge, to_list=self.eaten)
+            food.split(kcal=kcal, f_list=self.fridge, to_list=self.eaten)
             return kcal
         else:
-            food.portion(kcal=food.kcal_kg*food.kg, f_list=self.fridge, to_list=self.eaten)
+            food.split(kcal=food.kcal_kg*food.kg, f_list=self.fridge, to_list=self.eaten)
             return food.kcal_kg*food.kg
-    def get_recipe(self):
-        if len(self.pantry) < 5:
-            self.shop()
-        ingredients = []
-        servings = random.randint(4, 7)
-        for i in range(5):
-            item = random.choice(self.pantry)
-            item.portion(servings=servings, f_list=self.pantry, to_list=ingredients)
-        return ingredients
-    def shop(self):
-        #buy random food from the store
-        basket = self.store.shelves.sample(n=len(self.ppl)*self.shopping_frequency, replace=True)
-        for i in range(len(basket)):
-            item_info = basket.iloc[i].to_dict()
-            food = Food(item_info)
-            self.bought.append(copy.deepcopy(food))
-            if food.type == 'Store-Prepared Items':
-                self.fridge.append(food)
-            else:
-                self.pantry.append(food)
-    def throw_away(self, food: Food):
-        if food in self.pantry:
-            self.pantry.remove(food)
-        elif food in self.fridge:
-            self.fridge.remove(food)
-        for trash in food.throw():
-            self.trash.append(trash)
 
 class Neighborhood():
     def __init__(self, num_houses= 10):
@@ -368,42 +361,7 @@ class Neighborhood():
         for house in self.houses:
             self.collect_still_have(house=house)
     def collect_data(self, house: House, day: int):
-        for food in house.bought:
-            self.bought._append({
-                'House': house.id,
-                'Day Bought': day,
-                'Type': food.type,
-                'kg': food.kg,
-                'Price': food.price_kg*food.kg,
-                'Servings': food.servings,
-                'kcal': food.kcal_kg*food.kg,
-                'Exp': food.exp
-            }, ignore_index=True)
-            house.bought.remove(food)
-        for food in house.eaten:
-            self.eaten._append({
-                'House': house.id,
-                'Day Eaten': day,
-                'Type': food.type,
-                'kg': food.kg,
-                'Price': food.price_kg*food.kg,
-                'Servings': food.servings,
-                'kcal': food.kcal_kg*food.kg,
-                'Exp': food.exp
-            }, ignore_index=True)
-            house.eaten.remove(food)
-        for waste in house.trash:
-            self.wasted._append({
-                'House': house.id,
-                'Day Wasted': day,
-                'Type': waste.type,
-                'kg': waste.kg,
-                'Price': waste.price,
-                'Servings': waste.servings,
-                'kcal': waste.kcal,
-                'Status': waste.status
-            }, ignore_index=True)
-            house.trash.remove(waste)
+        pass
     def get_storage(self, house: House):
         for food in house.fridge:
             self.still_have._append({
@@ -433,6 +391,3 @@ class Neighborhood():
         self.wasted.to_csv('outputs/wasted.csv')
         self.still_have.to_csv('outputs/still_have.csv')
 
-neighborhood = Neighborhood(num_houses=1)
-neighborhood.run(days=56)
-neighborhood.data_to_csv()
