@@ -117,6 +117,7 @@ class Food():
         self.frozen = False
         self.serving_size = self.kg/self.servings
         self.kcal_kg = food_data['kcal_kg']
+        self.status = 'Un-prepped' if self.type != 'Store-Prepared Items' else 'Store-prepped'
     def decay(self):
         if self.frozen == False:
             self.exp -= 1
@@ -164,8 +165,8 @@ class Food():
         if self.kg <= 0.001 or self.servings <= 0.001:
             f_list.remove(self)
     def throw(self):
-        # return a list of waste
-        return [Waste(self)]
+        # return a list of wasted food
+        return [self]
 class CookedFood(Food):
     def __init__(self, ingredients:list):
         self.ingredients = ingredients
@@ -178,12 +179,14 @@ class CookedFood(Food):
         self.inedible_parts = 0
         self.exp = random.randint(4,7)
         for ingredient in ingredients:
+            ingredient.status = 'Home-prepped'
             self.kg += ingredient.kg
             price += ingredient.price_kg*ingredient.kg
             kcal += ingredient.kcal_kg*ingredient.kg
         self.price_kg = price/self.kg
         self.kcal_kg = kcal/self.kg
         self.serving_size = self.kg/self.servings
+        self.status = 'Home-prepped'
     def split(self, kcal: float, f_list: list, to_list: list = None ):
         new_ingredients = []
         if kcal > self.kcal_kg*self.kg:
@@ -194,25 +197,27 @@ class CookedFood(Food):
             # ratio to take the proper amount from each ingredient
             kcal_ratio = kcal/(self.kcal_kg*self.kg)
             for ingredient in self.ingredients:
-                new_food = ingredient.portion(kcal=ingredient.kcal_kg*ingredient.kg*kcal_ratio, f_list = self.ingredients, to_list= new_ingredients) # take the proper amount of each ingredient
+                new_food = ingredient.split(kcal=ingredient.kcal_kg*ingredient.kg*kcal_ratio, f_list = self.ingredients, to_list= new_ingredients) # take the proper amount of each ingredient
             new_cfood = CookedFood(ingredients=new_ingredients)
             self.kg -= new_cfood.kg
             to_list.append(new_cfood)
     def throw(self):
-        # return a list of waste
+        # return a list of wasted food
         waste_list = []
         for ingredient in self.ingredients:
-            waste_list.append(Waste(food=ingredient, status='Cooked'))
+            ingredient.exp = self.exp
+            waste_list.append(ingredient)
         return waste_list
 class Inedible():
     def __init__(self, food:Food):
         # creates a waste from the inedible parts of a food
         self.type = food.type
         self.kg = food.kg*food.inedible_parts
-        self.servings = 0
-        self.price = food.price_kg*food.kg
-        self.kcal = 0
+        self.servings = food.servings
+        self.price_kg = food.price_kg
+        self.kcal_kg = 0
         self.status = 'Inedible'
+        self.exp = None
         # update the food
         food.kg -= self.kg
         food.serving_size *= (1-food.inedible_parts)
@@ -275,7 +280,7 @@ class House():
         self.trash.append(food)
     def what_to_cook(self):
         # randomly pick 5 ingredients
-        if len(self.pantry) < 5:
+        while len(self.pantry) < 5:
             self.shop()
         ingredients = []
         servings = random.randint(4, 7)
@@ -286,10 +291,11 @@ class House():
             raise Exception("No empty ingredients list")
         return ingredients
     def prep(self, food:Food):
-            if ingredient.inedible_parts > 0 : 
+            if food.inedible_parts > 0 : 
                 scraps = Inedible(food=food)
+                self.trash.append(scraps)
     def cook(self):
-        ingredients = self.what_to_cook
+        ingredients = self.what_to_cook()
         for ingredient in ingredients:
             self.prep(ingredient)
         meal = CookedFood(ingredients=ingredients)
@@ -359,9 +365,42 @@ class Neighborhood():
                 house.do_a_day(day=i)
                 self.collect_data(house=house, day=i)
         for house in self.houses:
-            self.collect_still_have(house=house)
+            self.get_storage(house=house)
     def collect_data(self, house: House, day: int):
-        pass
+        for food in house.bought:
+            self.bought._append({
+                'House': house.id,
+                'Day Bought': day,
+                'Type': food.type,
+                'kg': food.kg,
+                'Price': food.price_kg*food.kg,
+                'Servings': food.servings,
+                'kcal':food.kcal_kg*food.kg,
+                'Exp': food.exp
+            }, ignore_index=True)
+        for food in house.eaten:
+            self.eaten._append({
+                'House': house.id,
+                'Day Eaten': day,
+                'Type': food.type,
+                'kg': food.kg,
+                'Price':food.price_kg*food.kg,
+                'Servings': food.servings,
+                'kcal': food.kcal_kg*food.kg,
+                'Exp': food.exp
+            }, ignore_index=True)
+        for food in house.trash:
+            self.wasted._append({
+                'House': house.id,
+                'Day Eaten':day,
+                'Type': food.type,
+                'kg': food.kg,
+                'Price': food.price_kg*food.kg,
+                'Servings': food.servings,
+                'kcal': food.kcal_kg*food.kg,
+                'Exp': food.exp,
+                'Status': food.status
+            }, ignore_index=True)
     def get_storage(self, house: House):
         for food in house.fridge:
             self.still_have._append({
@@ -371,7 +410,8 @@ class Neighborhood():
                 'Price': food.price_kg*food.kg,
                 'Servings': food.servings,
                 'kcal': food.kcal_kg*food.kg,
-                'Exp': food.exp
+                'Exp': food.exp,
+                'Status': food.status
             }, ignore_index=True)
             house.fridge.remove(food)
         for food in house.pantry:
@@ -391,3 +431,6 @@ class Neighborhood():
         self.wasted.to_csv('outputs/wasted.csv')
         self.still_have.to_csv('outputs/still_have.csv')
 
+neighborhood = Neighborhood(num_houses=1)
+neighborhood.run(days=56)
+neighborhood.data_to_csv()
