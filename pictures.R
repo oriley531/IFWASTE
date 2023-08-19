@@ -3,10 +3,14 @@ library(tidyverse)
 library(conflicted)
 
 # Pull the data
-bought <- read.csv("outputs/bought_food_1.csv")
-eaten <- read.csv("outputs/eaten_food_1.csv")
-wasted <- read.csv("outputs/wasted_food_1.csv")
-still <- read.csv("outputs/still_owned_1.csv")
+bought <- read.csv("outputs/bought.csv")
+eaten <- read.csv("outputs/eaten.csv")
+wasted <- read.csv("outputs/wasted.csv")
+still <- read.csv("outputs/still_have.csv")
+
+# make mass balance
+b_kg <- sum(bought$kg)
+e_kg <- sum(eaten$kg)
 
 # Make the totals bargraph's
 bought %>%

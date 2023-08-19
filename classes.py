@@ -1,9 +1,10 @@
 import random 
 import copy
 import pandas as pd
-'''Trying to find why it's dividing by 0,
-I think its because of ingredients returning an empty list sometimes but,
-I am unsure why that is happening'''
+
+def ingredient_test(l:list):
+    if len(l) == 0:
+        raise Exception("Ingredient list shouldn't be empty")
 class Store():
     def __init__(self):
         self.shelves = pd.DataFrame(columns= [
@@ -188,6 +189,7 @@ class CookedFood(Food):
         self.serving_size = self.kg/self.servings
         self.status = 'Home-prepped'
     def split(self, kcal: float, f_list: list, to_list: list = None ):
+        ingredient_test(self.ingredients)
         new_ingredients = []
         if kcal > self.kcal_kg*self.kg:
             kcal = self.kcal_kg*self.kg
