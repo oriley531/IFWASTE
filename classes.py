@@ -189,7 +189,7 @@ class CookedFood(Food):
         self.serving_size = self.kg/self.servings
     def portion(self, kcal: float, f_list: list, to_list: list = None ):
         new_ingredients = []
-        if kcal > self.kcal_kg*self.kg:
+        if kcal >= self.kcal_kg*self.kg:
             kcal = self.kcal_kg*self.kg
             f_list.remove(self)
             to_list.append(self)
@@ -366,7 +366,7 @@ class Neighborhood():
                 house.do_a_day(day=i)
                 self.collect_data(house=house, day=i)
         for house in self.houses:
-            self.collect_still_have(house=house)
+            self.get_storage(house=house)
     def collect_data(self, house: House, day: int):
         for food in house.bought:
             self.bought._append({
