@@ -189,9 +189,11 @@ class CookedFood(Food):
         self.serving_size = self.kg/self.servings
         self.status = 'Home-prepped'
     def split(self, kcal: float, f_list: list, to_list: list = None ):
+        # An issue from running I found was the if statement was > instead of >=
+        # because we want it to just move the whole thing if they are equal
         ingredient_test(self.ingredients)
         new_ingredients = []
-        if kcal > self.kcal_kg*self.kg:
+        if kcal >= self.kcal_kg*self.kg:
             kcal = self.kcal_kg*self.kg
             f_list.remove(self)
             to_list.append(self)
