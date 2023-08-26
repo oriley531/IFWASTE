@@ -372,7 +372,7 @@ class Neighborhood():
             self.get_storage(house=house)
     def collect_data(self, house: House, day: int):
         for food in house.bought:
-            self.bought._append({
+            self.bought.loc[len(self.bought)] = {
                 'House': house.id,
                 'Day Bought': day,
                 'Type': food.type,
@@ -381,10 +381,10 @@ class Neighborhood():
                 'Servings': food.servings,
                 'kcal':food.kcal_kg*food.kg,
                 'Exp': food.exp
-            }, ignore_index=True)
+            }
             house.bought.remove(food)
         for food in house.eaten:
-            self.eaten._append({
+            self.eaten.loc[len(self.eaten)] = {
                 'House': house.id,
                 'Day Eaten': day,
                 'Type': food.type,
@@ -393,10 +393,10 @@ class Neighborhood():
                 'Servings': food.servings,
                 'kcal': food.kcal_kg*food.kg,
                 'Exp': food.exp
-            }, ignore_index=True)
+            }
             house.eaten.remove(food)
         for food in house.trash:
-            self.wasted._append({
+            self.wasted.loc[len(self.wasted)] = {
                 'House': house.id,
                 'Day Eaten':day,
                 'Type': food.type,
@@ -406,11 +406,11 @@ class Neighborhood():
                 'kcal': food.kcal_kg*food.kg,
                 'Exp': food.exp,
                 'Status': food.status
-            }, ignore_index=True)
+            }
             house.trash.remove(food)
     def get_storage(self, house: House):
         for food in house.fridge:
-            self.still_have._append({
+            self.still_have.loc[len(self.still_have)] = {
                 'House': house.id,
                 'Type': food.type,
                 'kg': food.kg,
@@ -419,10 +419,10 @@ class Neighborhood():
                 'kcal': food.kcal_kg*food.kg,
                 'Exp': food.exp,
                 'Status': food.status
-            }, ignore_index=True)
+            }
             house.fridge.remove(food)
         for food in house.pantry:
-            self.still_have._append({
+            self.still_have.loc[len(self.still_have)] = {
                 'House': house.id,
                 'Type': food.type,
                 'kg': food.kg,
@@ -430,7 +430,7 @@ class Neighborhood():
                 'Servings': food.servings,
                 'kcal': food.kcal_kg*food.kg,
                 'Exp': food.exp
-            }, ignore_index=True)
+            }
             house.pantry.remove(food)
     def data_to_csv(self):
         self.bought.to_csv('outputs/bought.csv')
