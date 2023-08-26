@@ -11,6 +11,9 @@ still <- read.csv("outputs/still_have.csv")
 # make mass balance
 b_kg <- sum(bought$kg)
 e_kg <- sum(eaten$kg)
+w_kg <- sum(wasted$kg)
+s_kg <- sum(still$kg)
+mb <- b_kg - (e_kg + w_kg + s_kg)
 
 # Make the totals bargraph's
 bought %>%

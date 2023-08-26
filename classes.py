@@ -398,7 +398,7 @@ class Neighborhood():
         for food in house.trash:
             self.wasted.loc[len(self.wasted)] = {
                 'House': house.id,
-                'Day Eaten':day,
+                'Day Wasted':day,
                 'Type': food.type,
                 'kg': food.kg,
                 'Price': food.price_kg*food.kg,
