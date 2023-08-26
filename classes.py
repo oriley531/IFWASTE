@@ -262,7 +262,7 @@ class House():
         for i in range(len(basket)):
             item_info = basket.iloc[i].to_dict()
             food = Food(item_info)
-            self.store.inventory.append(copy.deepcopy(food))
+            self.bought.append(copy.deepcopy(food))
             if food.type == 'Store-Prepared Items':
                 self.fridge.append(food)
             else:
@@ -382,6 +382,7 @@ class Neighborhood():
                 'kcal':food.kcal_kg*food.kg,
                 'Exp': food.exp
             }, ignore_index=True)
+            house.bought.remove(food)
         for food in house.eaten:
             self.eaten._append({
                 'House': house.id,
@@ -393,6 +394,7 @@ class Neighborhood():
                 'kcal': food.kcal_kg*food.kg,
                 'Exp': food.exp
             }, ignore_index=True)
+            house.eaten.remove(food)
         for food in house.trash:
             self.wasted._append({
                 'House': house.id,
@@ -405,6 +407,7 @@ class Neighborhood():
                 'Exp': food.exp,
                 'Status': food.status
             }, ignore_index=True)
+            house.trash.remove(food)
     def get_storage(self, house: House):
         for food in house.fridge:
             self.still_have._append({
